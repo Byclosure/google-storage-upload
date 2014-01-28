@@ -79,7 +79,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	/**
 	 * The folder (in the bucket) to create.
 	 **/
-	@Parameter(property = "google-storage-upload.destination", defaultValue = "/")
+	@Parameter(property = "google-storage-upload.destination", defaultValue = "")
 	private String destination;
 
 	/**
@@ -109,6 +109,10 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		if (!source.exists()) {
 			throw new MojoExecutionException("File/folder doesn't exist: "
 					+ source);
+		}
+		if (destination != null && (destination.startsWith("/") || !destination.endsWith("/"))) {
+			throw new MojoExecutionException("destination can't start with /(slash) and can't end without it: "
+					+ destination);
 		}
 		try {
 			httpTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -172,8 +176,11 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 
 		FileContent putFC = new FileContent(type, file);
 
-		String putURI = "https://storage.googleapis.com/" + bucketName + "/"
-				+ destination + "/" + file.getName();
+		String putURI = "https://" + bucketName + ".storage.googleapis.com/";
+		if (destination != null) {
+			putURI += destination;
+		}
+		putURI += file.getName();
 		getLog().info("putURI - " + putURI);
 
 		GenericUrl putUrl = new GenericUrl(putURI);
