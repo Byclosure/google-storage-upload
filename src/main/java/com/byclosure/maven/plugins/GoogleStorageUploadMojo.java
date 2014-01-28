@@ -79,13 +79,13 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	/**
 	 * The folder (in the bucket) to create.
 	 **/
-	@Parameter(property = "google-storage-upload.destination", required = true)
+	@Parameter(property = "google-storage-upload.destination", defaultValue = "/")
 	private String destination;
 
 	/**
 	 * Execute all steps except the upload to the google storage. This can be
 	 * set to true to perform a "dryRun" execution.
-	 */
+	 **/
 	@Parameter(property = "google-storage-upload.doNotUpload", defaultValue = "false")
 	private boolean doNotUpload;
 
