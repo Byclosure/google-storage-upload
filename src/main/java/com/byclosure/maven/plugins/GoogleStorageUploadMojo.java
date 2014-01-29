@@ -59,10 +59,16 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	private File keyP12;
 
 	/**
-	 * Global configuration of Google Cloud Storage OAuth 2.0 scope.
+	 * Google Cloud Storage OAuth 2.0 scope.
 	 **/
 	@Parameter(property = "google-storage-upload.storageScope", defaultValue = "https://www.googleapis.com/auth/devstorage.full_control")
 	private String storageScope;
+	
+	/**
+	 * x-goog-acl header value. Read https://developers.google.com/storage/docs/reference-headers#xgoogacl
+	 **/
+	@Parameter(property = "google-storage-upload.xGoogAcl", defaultValue = "public-read")
+	private String xGoogAcl;
 
 	/**
 	 * The bucket to upload into.
@@ -172,7 +178,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	}
 
 	private void uploadFile(File file) throws IOException {
-		String type = "text/plain";
+		String type = "binary/octet-stream";
 
 		FileContent putFC = new FileContent(type, file);
 
@@ -187,6 +193,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		getLog().info("putUrl - " + putUrl);
 
 		HttpRequest putRequest = requestFactory.buildPutRequest(putUrl, putFC);
+		putRequest.getHeaders().set("x-goog-acl", xGoogAcl);
 		getLog().info("putRequest headers - " + putRequest.getHeaders());
 
 		if (!doNotUpload) {
