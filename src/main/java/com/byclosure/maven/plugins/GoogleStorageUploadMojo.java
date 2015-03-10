@@ -17,12 +17,14 @@ package com.byclosure.maven.plugins;
  */
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.FileNameMap;
 import java.net.URLConnection;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.maven.plugin.AbstractMojo;
@@ -40,6 +42,7 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
+import org.codehaus.plexus.util.FileUtils;
 
 /**
  * Goal which uploads a file (or directory) to google storage
@@ -70,23 +73,8 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	@Parameter(property = "google-storage-upload.xGoogAcl", defaultValue = "public-read")
 	private String xGoogAcl;
 
-	/**
-	 * The bucket to upload into.
-	 **/
-	@Parameter(property = "google-storage-upload.bucketName", required = true)
-	private String bucketName;
-
-	/**
-	 * The file/folder to upload.
-	 **/
-	@Parameter(property = "google-storage-upload.source", required = true)
-	private File source;
-
-	/**
-	 * The folder (in the bucket) to create.
-	 **/
-	@Parameter(property = "google-storage-upload.destination", defaultValue = "")
-	private String destination;
+	@Parameter(property = "google-storage-upload.upload", required = true)
+	private List upload;
 
 	/**
 	 * Execute all steps except the upload to the google storage. This can be
@@ -94,12 +82,6 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	 **/
 	@Parameter(property = "google-storage-upload.doNotUpload", defaultValue = "false")
 	private boolean doNotUpload;
-
-	/**
-	 * In the case of a directory upload, recursively upload the contents.
-	 **/
-	@Parameter(property = "google-storage-upload.recursive", defaultValue = "false")
-	private boolean recursive;
 
 	/** Global instance of the HTTP transport. */
 	private static HttpTransport httpTransport;
@@ -112,13 +94,41 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 	private static HttpRequestFactory requestFactory;
 
 	public void execute() throws MojoExecutionException {
-		if (!source.exists()) {
-			throw new MojoExecutionException("File/folder doesn't exist: "
-					+ source);
+		if (upload == null) {
+			throw new MojoExecutionException("Copy isn't defined");
 		}
-		if (destination != null && (destination.startsWith("/") || !destination.endsWith("/"))) {
+
+		for (Object obj : upload) {
+			final UploadConfiguration uploadDefinition = (UploadConfiguration)obj;
+			final File sourceFile = new File(uploadDefinition.getSource());
+
+			if (sourceFile.isDirectory()) {
+				final List<File> files;
+				try {
+					files = FileUtils.getFiles(sourceFile, uploadDefinition.getSourceIncludes(), null);
+				} catch (IOException e) {
+					throw new MojoExecutionException(e.getMessage());
+				}
+
+				for (File file : files) {
+					uploadFile(uploadDefinition, file);
+				}
+
+			} else {
+				uploadFile(uploadDefinition, new File(uploadDefinition.getSource()));
+			}
+		}
+	}
+
+	private void uploadFile(UploadConfiguration uploadDefinition, File sourceFile) throws MojoExecutionException {
+		if (!sourceFile.exists()) {
+			throw new MojoExecutionException("File/folder doesn't exist: "
+					+ uploadDefinition.getSource());
+		}
+		if (uploadDefinition.getDestination() != null &&
+				(uploadDefinition.getDestination().startsWith("/") || !uploadDefinition.getDestination().endsWith("/"))) {
 			throw new MojoExecutionException("destination can't start with /(slash) and can't end without it: "
-					+ destination);
+					+ uploadDefinition.getDestination());
 		}
 		try {
 			httpTransport = GoogleNetHttpTransport.newTrustedTransport();
@@ -132,9 +142,9 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 					.setServiceAccountPrivateKeyFromP12File(keyP12).build();
 			requestFactory = httpTransport.createRequestFactory(credential);
 
-			List<File> files = getUploadFiles(source);
+			List<File> files = getUploadFiles(sourceFile, uploadDefinition.isRecursive());
 			for (File file : files) {
-				uploadFile(file);
+				uploadFile(file, uploadDefinition.getBucketName(), uploadDefinition.getDestination());
 			}
 		} catch (GeneralSecurityException e) {
 			throw new MojoExecutionException(e.getMessage(), e);
@@ -143,7 +153,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		}
 	}
 
-	private List<File> getUploadFiles(File fileOrDirectory)
+	private List<File> getUploadFiles(File fileOrDirectory, boolean recursive)
 			throws MojoExecutionException {
 		List<File> files = new ArrayList<File>();
 		if (fileOrDirectory.isFile()) {
@@ -158,7 +168,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		} else if (fileOrDirectory.isDirectory()) {
 			for (File subFile : fileOrDirectory.listFiles()) {
 				if (!subFile.isDirectory() || recursive) {
-					if (!files.addAll(getUploadFiles(subFile))) {
+					if (!files.addAll(getUploadFiles(subFile, recursive))) {
 						throw new MojoExecutionException(
 								"Couldn't add all files in directory "
 										+ fileOrDirectory.getPath());
@@ -177,7 +187,7 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		return files;
 	}
 
-	private void uploadFile(File file) throws IOException {
+	private void uploadFile(File file, String bucketName, String destination) throws IOException {
 		String type = "binary/octet-stream";
 
 		FileContent putFC = new FileContent(type, file);
@@ -213,4 +223,5 @@ public class GoogleStorageUploadMojo extends AbstractMojo {
 		FileNameMap fileNameMap = URLConnection.getFileNameMap();
 		return fileNameMap.getContentTypeFor(fileUrl);
 	}
+
 }
