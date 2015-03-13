@@ -5,7 +5,7 @@
 
 	<groupId>com.byclosure.maven.plugins</groupId>
 	<artifactId>google-storage-upload</artifactId>
-	<version>0.0.3</version>
+	<version>0.0.4-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>com.byclosure.maven.plugins:google-storage-upload</name>
