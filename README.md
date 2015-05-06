@@ -29,7 +29,7 @@ Configure the credentials
 
 Configure the files to upload
 ```xml
-	<plugin>
+<plugin>
 	<groupId>com.byclosure.maven.plugins</groupId>
 	<artifactId>google-storage-upload</artifactId>
 	<version>0.0.2</version>
